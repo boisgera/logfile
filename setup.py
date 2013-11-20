@@ -26,4 +26,6 @@ info.update(metadata)
 info.update(contents)
 info.update(requirements)
 
-setup(name="logfile", py_modules=["logfile"])
+if __name__ == "__main__":
+    setuptools.setup(**info)
+
