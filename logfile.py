@@ -14,6 +14,7 @@ import types
 # Metadata
 # ------------------------------------------------------------------------------
 #
+__name__ = "logfile"
 __author__ = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
