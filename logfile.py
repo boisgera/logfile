@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 """
-Message Logging System
+Logging
 """
 
 # Python Standard Library
@@ -16,8 +15,17 @@ import types
 # ------------------------------------------------------------------------------
 #
 __author__ = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
-__version__ = None
-
+__license__ = "MIT License"
+__url__     = "https://github.com/boisgera/logfile"
+__version__ = "0.1.0-alpha"
+__classifiers__ = """
+Intended Audience :: Developers
+Operating System :: OS Independent
+Programming Language :: Python :: 2.7
+License :: OSI Approved :: MIT License
+Topic :: Software Development :: Libraries :: Python Modules
+Topic :: System :: Logging
+"""
 
 # ------------------------------------------------------------------------------
 # TODO: *shared* configuration between all loggers to make logging cooperative.
