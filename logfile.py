@@ -5,6 +5,7 @@ Logging
 """
 
 # Python Standard Library
+import datetime
 import importlib
 import inspect
 import sys
@@ -14,11 +15,11 @@ import types
 # Metadata
 # ------------------------------------------------------------------------------
 #
-__name__ = "logfile"
+__project__ = "logfile"
 __author__ = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
-__version__ = "0.1.0-alpha.1"
+__version__ = "0.1.0-alpha.3"
 __classifiers__ = """
 Intended Audience :: Developers
 Operating System :: OS Independent
@@ -29,6 +30,10 @@ Topic :: System :: Logging
 """
 
 # ------------------------------------------------------------------------------
+# TODO: for C/optimized code, issue a sub-module ("raw_logfile" for example ?
+#       that can be used in place of the logfile. Frame trickeries are disabled,
+#       naming has to be done manually. (Doable ?)
+#
 # TODO: *shared* configuration between all loggers to make logging cooperative.
 #
 # Design: given that all existing loggers shall *implicitly* refer to the config
@@ -47,6 +52,7 @@ Topic :: System :: Logging
 #        hierarchy of loggers context (say 'mystuff.deeper.blah') optionnaly
 #        inferred at loggers creation time by the __main__ variable ?
 #        CARE: this inference won't work if the module is used as a script ...
+#        (doctest stuff may be affected)
 
 # TODO: generalize the context so that we may say for example that we are in
 #       audio.wave.write (function write in the audio.wave module) ? Dynamic
@@ -97,6 +103,9 @@ Topic :: System :: Logging
 #       managers ?
 
 # TODO: implement the full local / global / builtin namespaces in templating.
+
+# TODO: replace the general hook system with an hardcoded system ? Hook only
+#       for critical an error for the moment ?
 
 #
 # Logger API
@@ -210,24 +219,49 @@ class LogFile(int):
         ...
         ForceError: I feel a great disturbance in the Force.
 """
-    def __new__(cls, name, number):
+    def __new__(cls, name, number, hook=None):
         return int.__new__(cls, number)
-    def __init__(self, name, number):
+
+    def __init__(self, name, number, hook=None):
         self.name = name
-        self._data = []
-        self._hooks = []
-    def set_hook(self, *hooks):
-        "Install logfile post-write hooks"
-        self._hooks = list(hooks)
+        self.hook = hook
+
+    def get_tag(self, message, *args, **kwargs):
+        tag = kwargs.get("_tag")
+        if tag is None:
+            _frame_depth = kwargs.get("_frame_depth") + 1
+
+            tag_parts = []          
+            frame = inspect.currentframe(_frame_depth)
+            if frame is None:
+                raise ValueError("can't get the caller frame")
+            module = inspect.getmodule(frame.f_code)
+            if module is not None:
+                tag_parts.append(module.__name__)
+            # TODO: manage "apps" (__main__ prefix ?) ? Use source info then ?
+            # TODO: get rid of "<module>" when you see it
+            function_name = frame.f_code.co_name
+            # Logfiles can be called at the module level.
+            if function_name != "<module>": 
+                tag_parts.append(function_name)
+            tag = ".".join(tag_parts)
+        return tag
+
+    def get_message(self, message, *args, **kwargs):
+        _frame_depth = kwargs.get("_frame_depth") + 1
+        frame = inspect.currentframe(_frame_depth)
+        if frame is None:
+            raise ValueError("can't get the caller frame")
+        locals_ = frame.f_locals
+        message = str(message).format(**locals_)
+        if message.endswith("\n"):
+            message = message[:-1]
+        return message
+
     def write(self, message):
-        # this do-nothing code ensures that when the user calls either
-        # `__call__` or `write`, it will go through exactly one extra
-        # function call before `inspect.stack` is called in `write`.
-        self._write(message)
+        self(message, _frame_depth=1)
+
     def __call__(self, message, *args, **kwargs):
-        self._write(message, *args, **kwargs)
-        self._write("\n", *args, **kwargs)
-    def _write(self, message, *args, **kwargs): 
         # the locals() from the user code are always 2 frames away.
         # ISSUE: when logger logfiles are used from Cython code, 
         #        there is no corresponding frame and we can't get
@@ -242,59 +276,67 @@ class LogFile(int):
         #       write something (performance reasons) or that some hooks
         #       require us to evaluate the message.
 
-        try:
-            frame = inspect.currentframe(2)
-            module = inspect.getmodule(frame.f_code) # TODO: manage None
-            if module is None:
-                prefix = ""
-            else:
-                prefix = module.__name__ + "."
+     # TODO: template substitution / namespace finding and tag finding
+     #       / analysis from arguments COULD be dispatched in methods so
+     #       that derived classes could implement non-standard (simpler ?)
+     #       schemes. Then, where/when do we try to get the frame ? We
+     #       Don't want to ask for it if that's not needed and we don't
+     #       want to ask for it twice either ? Arf, calling is twice is
+     #       probably not a big deal. But we need to give _depth along ?
+     #       Urk, that's hard on the implementer of new methods. Too bad :)
 
-            # TODO: manage "apps" (__main__ prefix ?) ?
 
-            print frame.f_code.co_name , ">>>"
-            name = prefix + frame.f_code.co_name
-            #module = frame.f_code.__module__
-            locals_ = frame.f_locals
-            message = str(message).format(**locals_)
-        except ValueError: # can't get the calling function frame.
-            message = str(message) # really ? C'mon ...
+        kwargs["_frame_depth"] = kwargs.get("_frame_depth", 0) + 1
+        message = self.get_message(message, *args, **kwargs)
+        tag = self.get_tag(message, *args, **kwargs)
+        date = datetime.datetime.now() # make a get_date method ?
+        item = dict(logfile=self, message=message, tag=tag, date=date)
 
-        self._data.append(message)
-        while True:
-            # really log something if a call with the "\n" argument is
-            # found, otherwise, just format and store the message.
-            # The print statements without a trailing comma will generate
-            # such a newline and every call to __call__ also does, so
-            # only prints with a trailing comma will be stacked. 
+        kwargs.pop("_tag", None)
+        kwargs.pop("_frame_depth", None)
+
+        if config.level >= self:
+            config.output.write(config.format(**item))
             try:
-                index = self._data.index("\n")
-            except ValueError:
-                break
-            # Should we chop of the trailing newline ? It kinda sucks
-            # with the error hook for example ... yeah, do that and
-            # modify the config.format accordingly.
-            message = "".join(self._data[:index])
-            if config.level >= self:
-                #tag_ = tag._tags.get(frame.f_code)
-                # tag_ = tag.get_current()
-                config.output.write(config.format(self, message, name))
-                try:
-                    config.output.flush()
-                except AttributeError:
-                    pass
-            for hook in self._hooks:
-                hook(message, *args, **kwargs)
-            self._data = self._data[index+1:]
+                config.output.flush()
+            except AttributeError:
+                pass
+        hook = self.hook
+        if hook is not None:
+            hook(message, *args, **kwargs) # use (item, *args, **kwargs) instead ?
+            # or (message, logfile, tag, date, *args, **kwargs ?) or
+            # (logfile (aka self), message, ...) ?
+
     def __str__(self):
         return self.name
-    __repr__ = __str__ # do something else ? 
 
-critical = LogFile("critical", -2) 
-error    = LogFile("error"   , -1)
+    __repr__ = __str__ # more explicit ?
+
+#
+# Standard LogFiles
+# ------------------------------------------------------------------------------
+#
+
+def critical_hook(message, status=None):
+    # If the status matters, override the message.
+    if status is not None:
+        sys.exit(status)
+    else:
+        sys.exit(message)
+
+def error_hook(message, type=ValueError, *args):
+    raise type(message, *args)
+
+critical = LogFile("critical", -2, hook=critical_hook)
+error    = LogFile("error"   , -1, hook=error_hook)
 warning  = LogFile("warning" ,  0)
 info     = LogFile("info"    ,  1)
 debug    = LogFile("debug"   ,  2)  
+
+#
+# Shared Configuration
+# ------------------------------------------------------------------------------
+#
 
 class Config(object):
     """
@@ -325,91 +367,28 @@ class Config(object):
 
 config = Config()
 
+#
+# Formatters
+# ------------------------------------------------------------------------------
+#
+
 # TODO: provide a choice of formatters ?
 
-#
-# Tagging
-# -------
-#
-
-# This is too much magic. I kinda like the code to tag stuff that allows
-# tag persistence and the fact that you cant tag the code you cant edit and
-# the auto "remove-tag" at the end of the function and even multi-tag a 
-# given section (may be handy for large functions that you don't want to
-# split just yet). And we cant even tag nested functions, use DYNAMIC tags
-# and so on. (Uhu there may be some issue with nested functions ...).
-# Expliciteness also solves the "used as a script" naming issue.
-# But the "I ain't really a module" is too much. Plus, there is some overhead
-# for every attribute access ...
-# The only good point about the current config is the `logger.tag += "stuff"`
-# shortcut. Is the use case that important ? Use a tag FUNCTION instead ?
-
-# TODO: document
-
-# TODO: support context manager AND decorator style.
-
-# TODO: experiment with Cython (ouch).
-
-# BUG: function with code / tag / code / tag / code: when we come back into
-#      the function, the 2nd tag is active.
-
-# Rk: the current "same code or no log" policy plays badly with decorators ...
-
-# TODO: Think of static methods and a stack policy for active tags ???
-
-class tag(object):
-    #_tags = {} # tags, indexed by code object.
-    _tags = []
-
-    @staticmethod
-    def get_current():
-        if tag._tags:
-            return tag._tags[-1]
-
-    def __init__(self, name=None):
-        self.name = name
-    def __enter__(self):
-        tag._tags.append(self.name)
-    def __exit__(self, exc_type=None, exc_value=None, traceback=None):
-        tag._tags.pop()
-    def __call__(self, function):
-        # see <http://www.python.org/dev/peps/pep-0343/>
-        enter = lambda: self.__enter__()
-        exit  = lambda: self.__exit__()
-        def _function(*args, **kwargs):
-            enter()
-            exc = True
-            try:
-                try:
-                    return function(*args, **kwargs)
-                except:
-                    exc = False
-                    if not exit():
-                        raise
-            finally:
-                if exc:
-                    exit()
-        # TODO: decoration scrambles docgen, solve that.
-        #       begin by restoring the function signature.
-        #       consider using the technique of the 'decorator' 
-        #       module.
-        #       We're probably missing the lineinfo data used by docgen
-        #       to find and layout the function doc ... Are they writable,
-        #       can we restore them ? OOOOOOOk, we end up with a reference
-        #       to the decorated function, whose source lives in the decorator
-        #       (here logging) module. Only a syntax based analysis of the
-        #       source file will save us I'm afraid ... 
-        _function.__name__ = function.__name__
-        _function.__doc__ = function.__doc__
-        return _function
-
-# tmp
-def _format(logfile, message, tag):
-    tag = tag or ""
-    return " {0!r:<9} | {1:<16} | {2}\n".format(logfile, tag, message)
+# tmp / DEBUG
+def _format(**kwargs):
+    kwargs["date"] = kwargs["date"].strftime("%Y/%m/%d %H:%M:%S")
+    # BUG: if i don't REPR the logfile, it ends up as an int ??? WTF ?
+    # TODO: manage multi-line messages.
+    # tag-length dependent padding or not ?
+    pad = 20 * " " + " " + 11 * " " + " " + 18 * " " + "|" + " "
+    return "{date} | {logfile!r:<9} | {tag:<16} | {message}\n".format(**kwargs)
 
 config.format = _format
 
+#
+# Unit Tests
+# ------------------------------------------------------------------------------
+#
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
