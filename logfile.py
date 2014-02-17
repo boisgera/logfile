@@ -19,7 +19,7 @@ __project__ = "logfile"
 __author__ = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __classifiers__ = """
 Intended Audience :: Developers
 Operating System :: OS Independent
@@ -243,7 +243,7 @@ class LogFile(int):
                     if app_name:
                         tag_parts.append(app_name)
                 else:
-                    tag_parts.append(name)
+                    tag_parts.append(module_name)
             function_name = frame.f_code.co_name
             # Logfiles can be called at the module level, get rid of <module>
             if function_name != "<module>": 
