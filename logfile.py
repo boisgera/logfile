@@ -19,7 +19,7 @@ __project__ = "logfile"
 __author__ = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
-__version__ = "0.1.0-alpha.3"
+__version__ = "0.2.0-alpha"
 __classifiers__ = """
 Intended Audience :: Developers
 Operating System :: OS Independent
@@ -237,11 +237,15 @@ class LogFile(int):
                 raise ValueError("can't get the caller frame")
             module = inspect.getmodule(frame.f_code)
             if module is not None:
-                tag_parts.append(module.__name__)
-            # TODO: manage "apps" (__main__ prefix ?) ? Use source info then ?
-            # TODO: get rid of "<module>" when you see it
+                module_name = module.__name__
+                if module_name == "__main__":
+                    app_name = getattr(module, "__project__")
+                    if app_name:
+                        tag_parts.append(app_name)
+                else:
+                    tag_parts.append(name)
             function_name = frame.f_code.co_name
-            # Logfiles can be called at the module level.
+            # Logfiles can be called at the module level, get rid of <module>
             if function_name != "<module>": 
                 tag_parts.append(function_name)
             tag = ".".join(tag_parts)
