@@ -19,7 +19,7 @@ __project__ = "logfile"
 __author__ = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
-__version__ = "0.2.0-alpha"
+__version__ = "0.2.0"
 __classifiers__ = """
 Intended Audience :: Developers
 Operating System :: OS Independent
