@@ -101,6 +101,12 @@ Topic :: System :: Logging
 #       kind of redundant ?). Yes, but only in logfile.warning calls, restore
 #       the filter state after that. Implement pre-post hooks as context
 #       managers ?
+#       ABOUT WARNINGS: logfile should probably NOT integrate warnings,
+#       because some features would be redundant (filters, print to
+#       stdout, etc.). The ability to turn warnings into errors could
+#       be easily programmed in each module that needs it, and controlled
+#       by a global function (think of `seterr` in `numpy`). No need to
+#       offer that in logfile ...
 
 # TODO: implement the full local / global / builtin namespaces in templating.
 
