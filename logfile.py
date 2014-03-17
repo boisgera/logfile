@@ -19,7 +19,7 @@ __project__ = "logfile"
 __author__ = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __classifiers__ = """
 Intended Audience :: Developers
 Operating System :: OS Independent
@@ -245,7 +245,7 @@ class LogFile(int):
             if module is not None:
                 module_name = module.__name__
                 if module_name == "__main__":
-                    app_name = getattr(module, "__project__")
+                    app_name = getattr(module, "__project__", None)
                     if app_name:
                         tag_parts.append(app_name)
                 else:
