@@ -37,7 +37,7 @@ import logfile
 info = dict(
   metadata     = about.get_metadata(logfile),
   code         = dict(py_modules=["logfile"]),
-  data         = dict(data_files = [("", ["README.md"])])
+  data         = dict(data_files = [("", ["README.md"])]),
   requirements = {},
   scripts      = {},
   commands     = {},
