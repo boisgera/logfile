@@ -17,7 +17,7 @@ import pkg_resources as pr
 # ------------------------------------------------------------------------------
 #
 __name__    = "logfile"
-__version__ = "1.0.0-alpha.1"
+__version__ = "1.0.0"
 __author__  = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
