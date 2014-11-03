@@ -1,33 +1,44 @@
 #!/usr/bin/env python
 # coding: utf-8
-"""
-Logging
-"""
 
-# Python Standard Library
+# Python 2.7 Standard Library
 import datetime
 import importlib
 import inspect
+import os.path
 import sys
 import types
+
+# Third-Party Libraries
+import pkg_resources as pr
 
 #
 # Metadata
 # ------------------------------------------------------------------------------
 #
-__project__ = "logfile"
-__author__ = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
+__name__    = "logfile"
+__version__ = "1.0.0-alpha.1"
+__author__  = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
-__version__ = "0.2.2"
-__classifiers__ = """
-Intended Audience :: Developers
-Operating System :: OS Independent
-Programming Language :: Python :: 2.7
-License :: OSI Approved :: MIT License
-Topic :: Software Development :: Libraries :: Python Modules
-Topic :: System :: Logging
-"""
+__summary__ = "File-based logging library"
+__readme__  = "README.md"
+__classifiers__ = [
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 2.7",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: System :: Logging",
+]
+
+if os.path.exists(__readme__) and os.path.exists("logfile.py"):
+    _filename = __readme__
+else:
+    requirement = pr.Requirement.parse("logfile")
+    _filename = pr.resource_filename(__readme__, "README.md")
+
+__doc__ = __summary__ + "\n" + open(_filename).read()
 
 # ------------------------------------------------------------------------------
 # TODO: for C/optimized code, issue a sub-module ("raw_logfile" for example ?
@@ -119,118 +130,12 @@ Topic :: System :: Logging
 #
 
 class LogFile(int):
-    """
-    LogFiles are files used to log messages.
-
-    TODO: talk about the level / int stuff and configuration after the
-          files properties ?
-
-    LogFiles also behave like integers: the number they represent denotes how 
-    important their messages are. The lower the logfile number, the more 
-    important the logfile. Five standard log files are defined:
-
-        >>> import logger
-        >>> names = "critical error warning info debug"
-        >>> for name in names.split():
-        ...     logfile = getattr(logger, name)
-        ...     print "{0:>8}: {1:>2}".format(name, int(logfile))
-        critical: -2
-           error: -1
-         warning:  0
-            info:  1
-           debug:  2
-
-    **TODO: migrate the config.level discussion to the config part, with
-    format and output discussion**
-
-    A message written into a logfile will effectively get logged only 
-    if the logfile number is less or equal to the current verbosity 
-    (`config.level`). For example, with the default logger 
-    verbosity (`0`), only messages send to the `critical`, `error` 
-    and `warning` logfiles will logged. As logfiles are integers, they
-    may be used directly to change the logger verbosity: the code
-
-        >>> logger.config.level = logger.info
-
-    will increase the verbosity to `1`, so that the messages to the `info`
-    are now logged. **TODO: test before after**
-
-    #### Writing into LogFiles
-
-    To demonstrate how logging works, we first make sure that the output of
-    the logfiles are `sys.stdout` instead of the default `sys.stderr`
-
-        >>> import sys
-        >>> logger.config.output = sys.stdout
-
-    Messages can be send to logfiles in two ways: either using the file 
-    interface, such as in:
-
-        >>> print >> logger.warning, "I feel a disturbance in the Force."
-        I feel a disturbance in the Force.
-
-    or using the callable interface:
-
-        >>> logger.warning("I feel a disturbance in the Force.")
-        I feel a disturbance in the Force.
-
-
-    The former call is handy to quicky convert a code full of  `print` 
-    statements without any hierarchy into the `logger` style 
-    of logging. 
-
-    #### Message Variables 
-
-    The message send to logfiles often depends on the value of some local
-    variables. To simplify this use case, we may refer to local variables
-    in messages with the same curly brace syntax use by the 
-    [string.format method][format]. The value of the variable will be
-    automatically substituted into the message. For example:
-
-        >>> jedi = "Luke"
-        >>> logger.info("Use the Force, {jedi}.")
-        Use the Force, Luke.
-
-    [format]: http://docs.python.org/library/string.html#formatstrings
-
-    #### LogFile Hooks
-
-    LogFile hooks are an easy way to trigger some action when some message
-    is sent to a logfile. A typical use case is to automatically raise an 
-    Exception when a message is sent to the `error` logfile:
-
-    First, we disable logging of `error` messages and set the exception hook:
-
-        >>> logger.config.level = logger.critical
-        >>> def raise_exception(message):
-        ...     raise Exception(message)
-        >>> logger.error.set_hook(raise_exception)
-
-    Now, if we use the logfile `logger.error`, we obtain:
-
-        >>> logger.error("I feel a great disturbance in the Force.")
-        Traceback (most recent call last):
-        ...
-        Exception: I feel a great disturbance in the Force.
-
-    LogFile hooks will use extra arguments in logfile calls, for example:
-
-        >>> def raise_exception(message, type=Exception):
-        ...     raise type(message)
-        >>> logger.error.set_hook(raise_exception)
-        >>> class ForceError(Exception):
-        ...     pass
-        >>> logger.error("I feel a great disturbance in the Force.", ForceError)
-        Traceback (most recent call last):
-        ...
-        ForceError: I feel a great disturbance in the Force.
-"""
-    def __new__(cls, name, number, hook=None):
+    def __new__(cls, name, number, _hook=None):
         return int.__new__(cls, number)
 
-    def __init__(self, name, number, hook=None):
+    def __init__(self, name, number, _hook=None):
         self.name = name
-        self.hook = hook
+        self._hook = _hook
 
     def get_tag(self, message, *args, **kwargs):
         tag = kwargs.get("_tag")
@@ -244,12 +149,7 @@ class LogFile(int):
             module = inspect.getmodule(frame.f_code)
             if module is not None:
                 module_name = module.__name__
-                if module_name == "__main__":
-                    app_name = getattr(module, "__project__", None)
-                    if app_name:
-                        tag_parts.append(app_name)
-                else:
-                    tag_parts.append(module_name)
+                tag_parts.append(module_name)
             function_name = frame.f_code.co_name
             # Logfiles can be called at the module level, get rid of <module>
             if function_name != "<module>": 
@@ -264,8 +164,6 @@ class LogFile(int):
             raise ValueError("can't get the caller frame")
         locals_ = frame.f_locals
         message = str(message).format(**locals_)
-        if message.endswith("\n"):
-            message = message[:-1]
         return message
 
     def write(self, message):
@@ -311,7 +209,7 @@ class LogFile(int):
                 config.output.flush()
             except AttributeError:
                 pass
-        hook = self.hook
+        hook = self._hook
         if hook is not None:
             hook(message, *args, **kwargs) # use (item, *args, **kwargs) instead ?
             # or (message, logfile, tag, date, *args, **kwargs ?) or
@@ -320,7 +218,9 @@ class LogFile(int):
     def __str__(self):
         return self.name
 
-    __repr__ = __str__ # more explicit ?
+    def __repr__(self): # unspecified behavior
+        return "Logfile({0.name!r}, {1})".format(self, int(self))
+    
 
 #
 # Standard LogFiles
@@ -328,17 +228,20 @@ class LogFile(int):
 #
 
 def critical_hook(message, status=None):
-    # If the status matters, override the message.
-    if status is not None:
-        sys.exit(status)
+    if status is not None: # unspecified behavior
+        sys.exit(status)   # override the message. 
     else:
+        if message.endswith("\n"):
+            message = message[:-1]
         sys.exit(message)
 
-def error_hook(message, type=ValueError, *args):
+def error_hook(message, type=Exception, *args):
+    if message.endswith("\n"):
+        message = message[:-1]
     raise type(message, *args)
 
-critical = LogFile("critical", -2, hook=critical_hook)
-error    = LogFile("error"   , -1, hook=error_hook)
+critical = LogFile("critical", -2, _hook=critical_hook)
+error    = LogFile("error"   , -1, _hook=error_hook)
 warning  = LogFile("warning" ,  0)
 info     = LogFile("info"    ,  1)
 debug    = LogFile("debug"   ,  2)  
@@ -354,26 +257,27 @@ class Config(object):
     """
     def __init__(self, level=None, output=None, format=None):
         """
-        The members of a `Config` instance are:
+        The attributes of a `Config` instance are:
 
-        `level:`
-          : is verbosity level: the higher it is, the more gets logged,
-        `output:`
-          : the common logger logfiles output file object,
-        `format:` 
-          : the customizable message formatting function whose
-            arguments are:
+          - `level`: verbosity level: the higher it is, the more gets logged,
+        
+          - `output`: the real output file object behind all logfiles,
+        
+          - `format`: a message formatting function whose arguments are
             
-            `logfile:`
-              : the logfile that requested the logging, 
-            `message:`
-              : the message logged.
+              - `logfile`: the logfile that requested the logging, 
+         
+              - `message`: the message logged,
+
+              - `tag`: a string that identifies the emitter function,
+
+              - `date`: a `datetime.datetime` instance.
         """
         self.level = level or 0
         self.output = output or sys.stderr
         self.format = format or self._format
-    def _format(self, logfile, message, tag):
-        return message + "\n"
+    def _format(self, **kwargs):
+        return kwargs["message"] #+ "\n"
 
 config = Config()
 
@@ -393,13 +297,6 @@ def _format(**kwargs):
     pad = 20 * " " + " " + 11 * " " + " " + 18 * " " + "|" + " "
     return "{date} | {logfile!r:<9} | {tag:<16} | {message}\n".format(**kwargs)
 
-config.format = _format
+# config.format = _format
 
-#
-# Unit Tests
-# ------------------------------------------------------------------------------
-#
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
 

@@ -1,2 +1,7 @@
-include about.py
+include README.md
+include LICENSE.txt
+include test.py
+exclude setup.cfg
+recursive-include .lib *
+recursive-exclude .lib *.pyc
 
