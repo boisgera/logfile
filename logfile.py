@@ -18,7 +18,7 @@ import pkg_resources as pr
 # ------------------------------------------------------------------------------
 #
 __name__    = "logfile"
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __author__  = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
@@ -37,7 +37,7 @@ if os.path.exists(__readme__) and os.path.exists("logfile.py"):
     _filename = __readme__
 else:
     requirement = pr.Requirement.parse("logfile")
-    _filename = pr.resource_filename(__readme__, "README.md")
+    _filename = pr.resource_filename(requirement, __readme__)
 
 __doc__ = __summary__ + "\n" + open(_filename).read()
 
