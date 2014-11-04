@@ -11,14 +11,14 @@ import types
 import weakref
 
 # Third-Party Libraries
-import pkg_resources as pr
+import pkg_resources
 
 #
 # Metadata
 # ------------------------------------------------------------------------------
 #
 __name__    = "logfile"
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 __author__  = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
@@ -34,12 +34,11 @@ __classifiers__ = [
 ]
 
 if os.path.exists(__readme__) and os.path.exists("logfile.py"):
-    _filename = __readme__
+    __doc__ = open(__readme__).read()
 else:
-    requirement = pr.Requirement.parse("logfile")
-    _filename = pr.resource_filename(requirement, __readme__)
+    __doc__ = pkg_resources.resource_string(__name__, __readme__)
 
-__doc__ = __summary__ + "\n" + open(_filename).read()
+__doc__ = __summary__ + "\n" + __doc__ # support for pydoc conventions.
 
 # ------------------------------------------------------------------------------
 # TODO: for C/optimized code, issue a sub-module ("raw_logfile" for example ?
