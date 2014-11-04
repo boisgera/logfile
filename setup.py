@@ -37,6 +37,9 @@ import logfile
 info = dict(
   metadata     = about.get_metadata(logfile),
   code         = dict(py_modules=["logfile"]),
+  # pip does not honor setuptools policy for non-package data files.
+  # I does follow distutils conventions instead (sort of, sys.prefix
+  # is not even used correctly). FUCK YOU PIP !
   data         = dict(data_files = [("", ["README.md"])]),
   requirements = {},
   scripts      = {},
