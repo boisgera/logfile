@@ -135,6 +135,25 @@ A message send to `error` triggers a call to `sys.exit`:
     This is the end for you ... my former master.
     SystemExit('This is the end for you ... my former master.',)
 
+Custom Output Format
+--------------------------------------------------------------------------------
 
+    >>> from datetime import datetime as _datetime
+    >>> class mock_datetime(object):
+    ...     @staticmethod
+    ...     def now():
+    ...         return _datetime(2014, 1, 1, 12, 00, 00)
+    >>> logfile.datetime.datetime = mock_datetime
 
+    >>> def format(**kwargs):
+    ...     kwargs["date"] = kwargs["date"].strftime("%Y/%m/%d %H:%M:%S")
+    ...     kwargs["logfile"] = str(kwargs["logfile"]).upper()
+    ...     return "{date} | {logfile} from {tag} | {message}".format(**kwargs)
+
+    >>> logfile.config.format = format
+
+    >>> def Yoda():
+    ...     info("Do. Or do not. There is no try.")
+    >>> Yoda()
+    2014/01/01 12:00:00 | INFO from Yoda | Do. Or do not. There is no try.
 

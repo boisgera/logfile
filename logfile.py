@@ -8,6 +8,7 @@ import inspect
 import os.path
 import sys
 import types
+import weakref
 
 # Third-Party Libraries
 import pkg_resources as pr
@@ -17,7 +18,7 @@ import pkg_resources as pr
 # ------------------------------------------------------------------------------
 #
 __name__    = "logfile"
-__version__ = "1.0.0"
+__version__ = "1.1.0-alpha"
 __author__  = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
@@ -129,6 +130,21 @@ __doc__ = __summary__ + "\n" + open(_filename).read()
 # ------------------------------------------------------------------------------
 #
 
+# Im am still searching for a good way to have better tags, either automatically
+# or manually ; both approaches are challenging. I'd rather have something
+# automatic to be honest, this is less API and paradoxically less complicated
+# to implement, a manual approach would probably have to mess with the identif
+# of frames and a (active) frame to tags dictionary.
+# Today, we end up with a module.function tag that does not understand closures 
+# or methods. We could scan a module source code once and for all and try to 
+# build a lines to name correspondance. Doit with an "auto_tag" function ?
+# Offer the same service for MANUAL tagging (possible ?) ?
+
+#_tags = {} # weakref.WeakKeyDictionary() does not work with frames :(
+#def tag(name, _frame_depth=0):
+#    frame = inspect.currentframe(_frame_depth + 1)
+#    _tags[frame] = name
+
 class LogFile(int):
     def __new__(cls, name, number, _hook=None):
         return int.__new__(cls, number)
@@ -137,16 +153,18 @@ class LogFile(int):
         self.name = name
         self._hook = _hook
 
-    def get_tag(self, message, *args, **kwargs):
-        tag = kwargs.get("_tag")
-        if tag is None:
-            _frame_depth = kwargs.get("_frame_depth") + 1
+    def get_frame(self, _frame_depth=0):
+        frame = inspect.currentframe(_frame_depth + 1)
+        if frame is None:
+            raise ValueError("can't get the caller frame")
+        return frame
 
-            tag_parts = []          
-            frame = inspect.currentframe(_frame_depth)
-            if frame is None:
-                raise ValueError("can't get the caller frame")
-            module = inspect.getmodule(frame.f_code)
+    def get_tag(self, frame):
+        tag = None # _tags.get(frame)
+        if tag is None:
+            tag_parts = []
+            code = frame.f_code
+            module = inspect.getmodule(code)
             if module is not None:
                 module_name = module.__name__
                 tag_parts.append(module_name)
@@ -157,11 +175,7 @@ class LogFile(int):
             tag = ".".join(tag_parts)
         return tag
 
-    def get_message(self, message, *args, **kwargs):
-        _frame_depth = kwargs.get("_frame_depth") + 1
-        frame = inspect.currentframe(_frame_depth)
-        if frame is None:
-            raise ValueError("can't get the caller frame")
+    def get_message(self, message, frame):
         locals_ = frame.f_locals
         message = str(message).format(**locals_)
         return message
@@ -170,38 +184,12 @@ class LogFile(int):
         self(message, _frame_depth=1)
 
     def __call__(self, message, *args, **kwargs):
-        # the locals() from the user code are always 2 frames away.
-        # ISSUE: when logger logfiles are used from Cython code, 
-        #        there is no corresponding frame and we can't get
-        #        to the locals ... we end up with a 'ValueError' 
-        #        instead. 
-        # Detect that frames do not work, let the use know about it ?
-        # Let him enable/disable frame + locals() magic based on this
-        # information ? That sucks ... writing two versions of the same
-        # code is not a solution !
-
-        # TODO: delay the inspect hackery until we know that we have to
-        #       write something (performance reasons) or that some hooks
-        #       require us to evaluate the message.
-
-     # TODO: template substitution / namespace finding and tag finding
-     #       / analysis from arguments COULD be dispatched in methods so
-     #       that derived classes could implement non-standard (simpler ?)
-     #       schemes. Then, where/when do we try to get the frame ? We
-     #       Don't want to ask for it if that's not needed and we don't
-     #       want to ask for it twice either ? Arf, calling is twice is
-     #       probably not a big deal. But we need to give _depth along ?
-     #       Urk, that's hard on the implementer of new methods. Too bad :)
-
-
-        kwargs["_frame_depth"] = kwargs.get("_frame_depth", 0) + 1
-        message = self.get_message(message, *args, **kwargs)
-        tag = self.get_tag(message, *args, **kwargs)
+        _frame_depth = kwargs.get("_frame_depth", 0) + 1
+        frame = self.get_frame(_frame_depth)
+        message = self.get_message(message, frame)
+        tag = self.get_tag(frame)
         date = datetime.datetime.now() # make a get_date method ?
         item = dict(logfile=self, message=message, tag=tag, date=date)
-
-        kwargs.pop("_tag", None)
-        kwargs.pop("_frame_depth", None)
 
         if config.level >= self:
             config.output.write(config.format(**item))
@@ -211,10 +199,7 @@ class LogFile(int):
                 pass
         hook = self._hook
         if hook is not None:
-            hook(message, *args, **kwargs) # use (item, *args, **kwargs) instead ?
-            # or (message, logfile, tag, date, *args, **kwargs ?) or
-            # (logfile (aka self), message, ...) ?
-
+            hook(message, *args, **kwargs)
     def __str__(self):
         return self.name
 
@@ -295,7 +280,7 @@ def _format(**kwargs):
     # TODO: manage multi-line messages.
     # tag-length dependent padding or not ?
     pad = 20 * " " + " " + 11 * " " + " " + 18 * " " + "|" + " "
-    return "{date} | {logfile!r:<9} | {tag:<16} | {message}\n".format(**kwargs)
+    return "{date} | {logfile.name:<9} | {tag:<16} | {message}\n".format(**kwargs)
 
 # config.format = _format
 
