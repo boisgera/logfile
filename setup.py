@@ -15,8 +15,11 @@ except ImportError:
     error = "pip is not installed, refer to <{url}> for instructions."
     raise ImportError(error.format(url="http://pip.readthedocs.org"))
 
+def local(path):
+    return os.path.join(os.path.dirname(__file__), path)
+
 # Extra Third-Party Libraries
-sys.path.insert(1, ".lib")
+sys.path.insert(1, local(".lib"))
 try:
     requirement = "about>=4.0.0"
 
@@ -30,6 +33,7 @@ except pkg_resources.DistributionNotFound:
 import about
 
 # This Package
+sys.path.insert(1, local(""))
 import logfile
 
 # ------------------------------------------------------------------------------
