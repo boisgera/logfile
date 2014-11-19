@@ -18,7 +18,7 @@ import pkg_resources
 # ------------------------------------------------------------------------------
 #
 __name__    = "logfile"
-__version__ = "1.1.3"
+__version__ = "1.2.0"
 __author__  = u"Sébastien Boisgérault <Sebastien.Boisgerault@mines-paristech.fr>"
 __license__ = "MIT License"
 __url__     = "https://github.com/boisgera/logfile"
@@ -144,6 +144,10 @@ __doc__ = __summary__ + "\n" + __doc__ # support for pydoc conventions.
 #    frame = inspect.currentframe(_frame_depth + 1)
 #    _tags[frame] = name
 
+def tag(tag_):
+    frame = inspect.currentframe(1)
+    frame.f_locals["_logfile_tag"] = tag_
+
 class LogFile(int):
     def __new__(cls, name, number, _hook=None):
         return int.__new__(cls, number)
@@ -159,7 +163,7 @@ class LogFile(int):
         return frame
 
     def get_tag(self, frame):
-        tag = None # _tags.get(frame)
+        tag = frame.f_locals.get("_logfile_tag")
         if tag is None:
             tag_parts = []
             code = frame.f_code
